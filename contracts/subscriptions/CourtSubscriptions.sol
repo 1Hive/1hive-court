@@ -158,6 +158,9 @@ contract CourtSubscriptions is ControlledRecoverable, TimeHelpers, RegisterAndCa
 
     /**
     * @dev The user just verified themselves in the BrightIdRegister, claim on there behalf.
+    * @param _usersSenderAddress The address from which the transaction was created
+    * @param _usersUniqueId The unique address assigned to the registered BrightId user
+    * @param _data Data used to determine what function to call, unused here
     */
     function receiveRegistration(address _usersSenderAddress, address _usersUniqueId, bytes calldata _data) external {
         require(msg.sender == address(_brightIdRegister()), ERROR_SENDER_NOT_BRIGHTID_REGISTER);
