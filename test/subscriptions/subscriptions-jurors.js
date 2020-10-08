@@ -180,7 +180,7 @@ contract('CourtSubscriptions', ([_, payer, jurorPeriod0Term1, jurorPeriod0Term1U
     })
   })
 
-  describe.only('receiveRegistration(address _usersSenderAddress, address _usersUniqueId, bytes _data)', () => {
+  describe('receiveRegistration(address _usersSenderAddress, address _usersUniqueId, bytes _data)', () => {
 
     it('registers and claims fess for initially unverified user', async () => {
       await activateJurors()
@@ -192,6 +192,8 @@ contract('CourtSubscriptions', ([_, payer, jurorPeriod0Term1, jurorPeriod0Term1U
       await brightIdHelper.registerUserWithData(jurorPeriod0Term3, subscriptions.address, '0x0')
 
       assert.isTrue(await subscriptions.hasJurorClaimed(jurorPeriod0Term3))
+      assert.isTrue(await brightIdRegister.isVerified(jurorPeriod0Term3))
+
     })
   })
 
