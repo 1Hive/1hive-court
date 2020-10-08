@@ -9,10 +9,9 @@ import "../lib/os/TimeHelpers.sol";
 import "../registry/IJurorsRegistry.sol";
 import "../court/controller/Controller.sol";
 import "../court/controller/ControlledRecoverable.sol";
+import "../brightid/RegisterAndCall.sol";
 
-// TODO: Integrate BrightIdUserRegister, otherwise someone could stake as a juror, update their verified account
-//  and withdraw fees using both accounts, if the jurors registry converts the sending address to the unique address.
-contract CourtSubscriptions is ControlledRecoverable, TimeHelpers {
+contract CourtSubscriptions is ControlledRecoverable, TimeHelpers, RegisterAndCall {
     using SafeERC20 for ERC20;
     using SafeMath for uint256;
     using SafeMath64 for uint64;
@@ -25,6 +24,8 @@ contract CourtSubscriptions is ControlledRecoverable, TimeHelpers {
     string private constant ERROR_JUROR_NOTHING_TO_CLAIM = "CS_JUROR_NOTHING_TO_CLAIM";
     string private constant ERROR_COURT_HAS_NOT_STARTED = "CS_COURT_HAS_NOT_STARTED";
     string private constant ERROR_FUTURE_PERIOD = "CS_FUTURE_PERIOD";
+    string private constant ERROR_SENDER_NOT_VERIFIED = "CS_SENDER_NOT_VERIFIED";
+    string private constant ERROR_SENDER_NOT_BRIGHTID_REGISTER = "CS_SENDER_NOT_BRIGHTID_REGISTER";
 
     // Term 0 is for jurors on-boarding
     uint64 internal constant START_TERM_ID = 1;
@@ -76,22 +77,7 @@ contract CourtSubscriptions is ControlledRecoverable, TimeHelpers {
     * @notice Claim proportional share of fees for the previous period
     */
     function claimFees() external {
-        // Juror share fees can only be claimed for past periods
-        uint256 currentPeriod = _getCurrentPeriodId();
-        require(currentPeriod > 0, ERROR_STILL_PERIOD_ZERO);
-        Period storage period = periods[currentPeriod - 1];
-        require(!period.claimedFees[msg.sender], ERROR_JUROR_FEES_ALREADY_CLAIMED);
-
-        // Check claiming juror has share fees to be transferred
-        (uint64 periodBalanceCheckpoint, uint256 totalActiveBalance, uint256 donatedFees)
-            = _ensurePeriodBalanceDetails(currentPeriod - 1, period);
-        uint256 jurorShare = _getJurorShare(msg.sender, periodBalanceCheckpoint, totalActiveBalance, donatedFees);
-        require(jurorShare > 0, ERROR_JUROR_NOTHING_TO_CLAIM);
-
-        // Update juror state and transfer share fees
-        period.claimedFees[msg.sender] = true;
-        emit FeesClaimed(msg.sender, currentPeriod - 1, jurorShare);
-        require(period.feeToken.safeTransfer(msg.sender, jurorShare), ERROR_TOKEN_TRANSFER_FAILED);
+        _claimFeesFor(msg.sender);
     }
 
     /**
@@ -166,7 +152,39 @@ contract CourtSubscriptions is ControlledRecoverable, TimeHelpers {
     function hasJurorClaimed(address _juror) external view returns (bool) {
         uint256 currentPeriod = _getCurrentPeriodId();
         require(currentPeriod > 0, ERROR_STILL_PERIOD_ZERO);
-        return periods[currentPeriod - 1].claimedFees[_juror];
+        address jurorUniqueId = _brightIdRegister().uniqueUserId(_juror);
+        return periods[currentPeriod - 1].claimedFees[jurorUniqueId];
+    }
+
+    /**
+    * @dev The user just verified themselves in the BrightIdRegister, claim on there behalf.
+    */
+    function receiveRegistration(address _usersSenderAddress, address _usersUniqueId, bytes calldata _data) external {
+        require(msg.sender == address(_brightIdRegister()), ERROR_SENDER_NOT_BRIGHTID_REGISTER);
+        _claimFeesFor(_usersSenderAddress);
+    }
+
+    function _claimFeesFor(address _juror) internal {
+        // Juror share fees can only be claimed for past periods
+        uint256 currentPeriod = _getCurrentPeriodId();
+        require(currentPeriod > 0, ERROR_STILL_PERIOD_ZERO);
+        Period storage period = periods[currentPeriod - 1];
+
+        require(_brightIdRegister().isVerified(_juror), ERROR_SENDER_NOT_VERIFIED);
+        address jurorUniqueId = _brightIdRegister().uniqueUserId(_juror);
+
+        require(!period.claimedFees[jurorUniqueId], ERROR_JUROR_FEES_ALREADY_CLAIMED);
+
+        // Check claiming juror has share fees to be transferred
+        (uint64 periodBalanceCheckpoint, uint256 totalActiveBalance, uint256 donatedFees)
+        = _ensurePeriodBalanceDetails(currentPeriod - 1, period);
+        uint256 jurorShare = _getJurorShare(jurorUniqueId, periodBalanceCheckpoint, totalActiveBalance, donatedFees);
+        require(jurorShare > 0, ERROR_JUROR_NOTHING_TO_CLAIM);
+
+        // Update juror state and transfer share fees
+        period.claimedFees[jurorUniqueId] = true;
+        emit FeesClaimed(jurorUniqueId, currentPeriod - 1, jurorShare);
+        require(period.feeToken.safeTransfer(_juror, jurorShare), ERROR_TOKEN_TRANSFER_FAILED);
     }
 
     /**

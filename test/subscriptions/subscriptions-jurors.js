@@ -14,8 +14,9 @@ const JurorsRegistry = artifacts.require('JurorsRegistry')
 const DisputeManager = artifacts.require('DisputeManagerMockForRegistry')
 const ERC20 = artifacts.require('ERC20Mock')
 
-contract('CourtSubscriptions', ([_, payer, jurorPeriod0Term1, jurorPeriod0Term3, jurorMidPeriod1]) => {
-  let controller, subscriptions, jurorsRegistry, feeToken, jurorToken, brightIdHelper
+contract('CourtSubscriptions', ([_, payer, jurorPeriod0Term1, jurorPeriod0Term1UniqueAddress, jurorPeriod0Term3,
+  jurorPeriod0Term3NewAddress, jurorMidPeriod1]) => {
+  let controller, subscriptions, jurorsRegistry, feeToken, jurorToken, brightIdHelper, brightIdRegister
 
   const PCT_BASE = bn(10000)
   const DONATED_FEES = bigExp(10, 18)
@@ -44,8 +45,9 @@ contract('CourtSubscriptions', ([_, payer, jurorPeriod0Term1, jurorPeriod0Term3,
     await controller.setDisputeManager(disputeManager.address)
 
     brightIdHelper = buildBrightIdHelper()
-    const brightIdRegister = await brightIdHelper.deploy()
-    await brightIdHelper.registerUsers([jurorPeriod0Term1, jurorPeriod0Term3, jurorMidPeriod1])
+    brightIdRegister = await brightIdHelper.deploy()
+    await brightIdHelper.registerUserWithMultipleAddresses(jurorPeriod0Term1UniqueAddress, jurorPeriod0Term1)
+    await brightIdHelper.registerUsers([jurorPeriod0Term3, jurorMidPeriod1])
     await controller.setBrightIdRegister(brightIdRegister.address)
 
     // Donate subscription fees
@@ -158,11 +160,38 @@ contract('CourtSubscriptions', ([_, payer, jurorPeriod0Term1, jurorPeriod0Term3,
 
         await assertRevert(subscriptions.claimFees({ from: jurorPeriod0Term1 }), 'CS_JUROR_FEES_ALREADY_CLAIMED')
       })
+
+      it('reverts when claiming fees twice using two verified addresses', async () => {
+        await setCheckpointUsedToTerm(3)
+        await subscriptions.claimFees({ from: jurorPeriod0Term3 })
+        await brightIdHelper.registerUserWithMultipleAddresses(jurorPeriod0Term3, jurorPeriod0Term3NewAddress)
+        await assertRevert(subscriptions.claimFees({ from: jurorPeriod0Term3NewAddress }), 'CS_JUROR_FEES_ALREADY_CLAIMED')
+      })
+
+      it('reverts when juror uses a previous unverified address', async () => {
+        await setCheckpointUsedToTerm(1)
+        await assertRevert(subscriptions.claimFees({ from: jurorPeriod0Term1UniqueAddress }), 'CS_SENDER_NOT_VERIFIED')
+      })
     })
 
     it('reverts when juror has nothing to claim', async () => {
       await controller.mockSetTerm(PERIOD_DURATION + 1)
       await assertRevert(subscriptions.claimFees({ from: jurorPeriod0Term1 }), SUBSCRIPTIONS_ERRORS.JUROR_NOTHING_TO_CLAIM)
+    })
+  })
+
+  describe.only('receiveRegistration(address _usersSenderAddress, address _usersUniqueId, bytes _data)', () => {
+
+    it('registers and claims fess for initially unverified user', async () => {
+      await activateJurors()
+      await setCheckpointUsedToTerm(3)
+      await brightIdHelper.expireVerifiedUsers()
+      assert.isFalse(await subscriptions.hasJurorClaimed(jurorPeriod0Term3))
+      assert.isFalse(await brightIdRegister.isVerified(jurorPeriod0Term3))
+
+      await brightIdHelper.registerUserWithData(jurorPeriod0Term3, subscriptions.address, '0x0')
+
+      assert.isTrue(await subscriptions.hasJurorClaimed(jurorPeriod0Term3))
     })
   })
 
@@ -348,6 +377,15 @@ contract('CourtSubscriptions', ([_, payer, jurorPeriod0Term1, jurorPeriod0Term3,
     it('reverts when current period is 0', async () => {
       await controller.mockSetTerm(1) // Is in period 0
       await assertRevert(subscriptions.hasJurorClaimed(jurorPeriod0Term1), 'CS_STILL_PERIOD_ZERO')
+    })
+
+    it('returns the same result when using any previously verified address', async () => {
+      await activateJurors()
+      await setCheckpointUsedToTerm(1)
+      await subscriptions.claimFees({ from: jurorPeriod0Term1 })
+
+      assert.isTrue(await subscriptions.hasJurorClaimed(jurorPeriod0Term1))
+      assert.isTrue(await subscriptions.hasJurorClaimed(jurorPeriod0Term1UniqueAddress))
     })
   })
 })
