@@ -13,10 +13,11 @@ import "../standards/ERC900.sol";
 import "../standards/ApproveAndCall.sol";
 import "../court/controller/Controller.sol";
 import "../court/controller/ControlledRecoverable.sol";
+import "../brightid/RegisterAndCall.sol";
 
 import "@nomiclabs/buidler/console.sol"; // TODO: Remove
 
-contract JurorsRegistry is ControlledRecoverable, IJurorsRegistry, ERC900, ApproveAndCallFallBack {
+contract JurorsRegistry is ControlledRecoverable, IJurorsRegistry, ERC900, ApproveAndCallFallBack, RegisterAndCall {
     using SafeERC20 for ERC20;
     using SafeMath for uint256;
     using PctHelpers for uint256;
@@ -41,6 +42,8 @@ contract JurorsRegistry is ControlledRecoverable, IJurorsRegistry, ERC900, Appro
     string private constant ERROR_TOTAL_ACTIVE_BALANCE_EXCEEDED = "JR_TOTAL_ACTIVE_BALANCE_EXCEEDED";
     string private constant ERROR_WITHDRAWALS_LOCK = "JR_WITHDRAWALS_LOCK";
     string private constant ERROR_SENDER_NOT_VERIFIED = "JR_SENDER_NOT_VERIFIED";
+    string private constant ERROR_SENDER_NOT_BRIGHTID_REGISTER = "JR_SENDER_NOT_BRIGHTID_REGISTER";
+    string private constant ERROR_NO_FUNCTION_MATCH = "JR_NO_FUNCTION_MATCH";
 
     // Address that will be used to burn juror tokens
     address internal constant BURN_ACCOUNT = address(0x000000000000000000000000000000000000dEaD);
@@ -159,22 +162,7 @@ contract JurorsRegistry is ControlledRecoverable, IJurorsRegistry, ERC900, Appro
     */
     function deactivate(uint256 _amount) external {
         require(_brightIdRegister().isVerified(msg.sender), ERROR_SENDER_NOT_VERIFIED);
-        uint64 termId = _ensureCurrentTerm();
-
-        address jurorUniqueAddress = _jurorUniqueId(msg.sender);
-        Juror storage juror = jurorsByAddress[jurorUniqueAddress];
-
-        uint256 unlockedActiveBalance = _lastUnlockedActiveBalanceOf(juror);
-        uint256 amountToDeactivate = _amount == 0 ? unlockedActiveBalance : _amount;
-        require(amountToDeactivate > 0, ERROR_INVALID_ZERO_AMOUNT);
-        require(amountToDeactivate <= unlockedActiveBalance, ERROR_INVALID_DEACTIVATION_AMOUNT);
-
-        // No need for SafeMath: we already checked values above
-        uint256 futureActiveBalance = unlockedActiveBalance - amountToDeactivate;
-        uint256 minActiveBalance = _getMinActiveBalance(termId);
-        require(futureActiveBalance == 0 || futureActiveBalance >= minActiveBalance, ERROR_INVALID_DEACTIVATION_AMOUNT);
-
-        _createDeactivationRequest(jurorUniqueAddress, amountToDeactivate);
+        _deactivateTokens(_jurorUniqueId(msg.sender), _amount);
     }
 
     /**
@@ -218,6 +206,52 @@ contract JurorsRegistry is ControlledRecoverable, IJurorsRegistry, ERC900, Appro
         require(msg.sender == _token && _token == address(jurorsToken), ERROR_TOKEN_APPROVE_NOT_ALLOWED);
         require(_brightIdRegister().isVerified(_from), ERROR_SENDER_NOT_VERIFIED);
         _stake(_from, _jurorUniqueId(_from), _amount, _data);
+    }
+
+    /**
+    * @dev The user just verified themselves in the BrightIdRegister, check the function call in _data, extract the
+    *       params and execute it.
+    * @param _jurorSenderAddress The address from which the transaction was created
+    * @param _jurorUniqueId The unique address assigned to the registered BrightId user
+    * @param _data Data used to determine what function to call
+    */
+    function receiveRegistration(address _jurorSenderAddress, address _jurorUniqueId, bytes calldata _data) external {
+        require(msg.sender == address(_brightIdRegister()), ERROR_SENDER_NOT_BRIGHTID_REGISTER);
+
+        bytes memory dataMemory = _data;
+        bytes4 functionSelector = dataMemory.toBytes4();
+        uint256 amount = dataMemory.toUint256(36); // amountLocation: 32 + 4 = 36 (bytes array length + sig)
+        bytes memory callData = dataMemory.toBytes(48); // amountLocation: 32 + 4 + 32 = 48 (bytes array length + sig + uint256 _amount)
+
+        if (functionSelector == JurorsRegistry(this).activate.selector) {
+//            assembly {
+//                amount := mload(add(dataMemory, 36)) // amountLocation: 32 + 4 = 36 (bytes array length + sig)
+//            }
+            _activateTokens(_jurorUniqueId, amount, _jurorSenderAddress);
+
+        } else if (functionSelector == JurorsRegistry(this).deactivate.selector) {
+//            assembly {
+//                amount := mload(add(dataMemory, 36)) // amountLocation: 32 + 4 = 36 (bytes array length + sig)
+//            }
+            _deactivateTokens(_jurorUniqueId, amount);
+
+        } else if (functionSelector == JurorsRegistry(this).stake.selector) {
+//            assembly {
+//                amount := mload(add(dataMemory, 36)) // amountLocation: 32 + 4 = 36 (bytes array length + sig)
+//                callData := mload(add(dataMemory, 48)) // amountLocation: 32 + 4 + 32 = 48 (bytes array length + sig + uint256 _amount)
+//            }
+            _stake(_jurorSenderAddress, _jurorUniqueId, amount, callData);
+
+        } else if (functionSelector == JurorsRegistry(this).unstake.selector) {
+//            assembly {
+//                amount := mload(add(dataMemory, 36)) // amountLocation: 32 + 4 = 36 (bytes array length + sig)
+//                callData := mload(add(dataMemory, 48)) // amountLocation: 32 + 4 + 32 = 48 (bytes array length + sig + uint256 _amount)
+//            }
+            _unstake(_jurorSenderAddress, _jurorUniqueId, amount, callData);
+
+        } else {
+            revert(ERROR_NO_FUNCTION_MATCH);
+        }
     }
 
     /**
@@ -638,6 +672,24 @@ contract JurorsRegistry is ControlledRecoverable, IJurorsRegistry, ERC900, Appro
 
         _updateAvailableBalanceOf(_juror, amountToActivate, false);
         emit JurorActivated(_juror, nextTermId, amountToActivate, _sender);
+    }
+
+    function _deactivateTokens(address _juror, uint256 _amount) internal {
+        uint64 termId = _ensureCurrentTerm();
+
+        Juror storage juror = jurorsByAddress[_juror];
+
+        uint256 unlockedActiveBalance = _lastUnlockedActiveBalanceOf(juror);
+        uint256 amountToDeactivate = _amount == 0 ? unlockedActiveBalance : _amount;
+        require(amountToDeactivate > 0, ERROR_INVALID_ZERO_AMOUNT);
+        require(amountToDeactivate <= unlockedActiveBalance, ERROR_INVALID_DEACTIVATION_AMOUNT);
+
+        // No need for SafeMath: we already checked values above
+        uint256 futureActiveBalance = unlockedActiveBalance - amountToDeactivate;
+        uint256 minActiveBalance = _getMinActiveBalance(termId);
+        require(futureActiveBalance == 0 || futureActiveBalance >= minActiveBalance, ERROR_INVALID_DEACTIVATION_AMOUNT);
+
+        _createDeactivationRequest(_juror, amountToDeactivate);
     }
 
     /**
