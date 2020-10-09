@@ -13,7 +13,7 @@ const DisputeManager = artifacts.require('DisputeManagerMockForRegistry')
 const ERC20 = artifacts.require('ERC20Mock')
 
 contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
-  let buildHelperClass, controller, registry, disputeManager, ANJ
+  let buildHelperClass, controller, registry, disputeManager, ANJ, brightIdHelper, brightIdRegister
   let addresses, timestamp, sig
 
   const USE_MAX_ACTIVE_AMOUNT_FOR_0_JURORS = -1
@@ -66,8 +66,8 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
     disputeManager = await DisputeManager.new(controller.address)
     await controller.setDisputeManager(disputeManager.address)
 
-    const brightIdHelper = buildBrightIdHelper()
-    const brightIdRegister = await brightIdHelper.deploy()
+    brightIdHelper = buildBrightIdHelper()
+    brightIdRegister = await brightIdHelper.deploy()
     await brightIdHelper.registerUserWithMultipleAddresses(jurorUniqueAddress, juror)
     await brightIdHelper.registerUser(juror2)
     await controller.setBrightIdRegister(brightIdRegister.address)
@@ -286,6 +286,25 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
         context('when the juror uses an unverified previous address', () => {
           it('reverts', async () => {
             await assertRevert(registry.activate(MIN_ACTIVE_AMOUNT, { from: jurorUniqueAddress }), 'JR_SENDER_NOT_VERIFIED')
+          })
+        })
+
+        context('when the juror calls activate through via BrightIdRegister', () => {
+          it.only('activates tokens as expected', async () => {
+            const activateAmount = MIN_ACTIVE_AMOUNT
+            await ANJ.generateTokens(juror2, activateAmount)
+            await ANJ.approveAndCall(registry.address, activateAmount, '0x', { from: juror2 })
+            const activateFunctionData = registry.contract.methods.activate(activateAmount.toString()).encodeABI()
+            const { active: previousActiveBalance } = await registry.balanceOf(juror2)
+
+            await brightIdHelper.expireVerifiedUsers()
+            assert.isFalse(await brightIdRegister.isVerified(juror2))
+
+            await brightIdHelper.registerUserWithData(juror2, registry.address, activateFunctionData)
+
+            const { active: currentActiveBalance } = await registry.balanceOf(juror2)
+            assertBn(currentActiveBalance, previousActiveBalance.add(activateAmount), 'Incorrect active balance')
+            assert.isTrue(await brightIdRegister.isVerified(juror2))
           })
         })
       })

@@ -218,35 +218,21 @@ contract JurorsRegistry is ControlledRecoverable, IJurorsRegistry, ERC900, Appro
     function receiveRegistration(address _jurorSenderAddress, address _jurorUniqueId, bytes calldata _data) external {
         require(msg.sender == address(_brightIdRegister()), ERROR_SENDER_NOT_BRIGHTID_REGISTER);
 
-        bytes memory dataMemory = _data;
-        bytes4 functionSelector = dataMemory.toBytes4();
-        uint256 amount = dataMemory.toUint256(36); // amountLocation: 32 + 4 = 36 (bytes array length + sig)
-        bytes memory callData = dataMemory.toBytes(48); // amountLocation: 32 + 4 + 32 = 48 (bytes array length + sig + uint256 _amount)
+        bytes4 functionSelector = _data.toBytes4();
+        uint256 amount = _data.toUint256(36); // amountLocation: 32 + 4 = 36 (bytes array length + sig)
 
         if (functionSelector == JurorsRegistry(this).activate.selector) {
-//            assembly {
-//                amount := mload(add(dataMemory, 36)) // amountLocation: 32 + 4 = 36 (bytes array length + sig)
-//            }
             _activateTokens(_jurorUniqueId, amount, _jurorSenderAddress);
 
         } else if (functionSelector == JurorsRegistry(this).deactivate.selector) {
-//            assembly {
-//                amount := mload(add(dataMemory, 36)) // amountLocation: 32 + 4 = 36 (bytes array length + sig)
-//            }
             _deactivateTokens(_jurorUniqueId, amount);
 
         } else if (functionSelector == JurorsRegistry(this).stake.selector) {
-//            assembly {
-//                amount := mload(add(dataMemory, 36)) // amountLocation: 32 + 4 = 36 (bytes array length + sig)
-//                callData := mload(add(dataMemory, 48)) // amountLocation: 32 + 4 + 32 = 48 (bytes array length + sig + uint256 _amount)
-//            }
+            bytes memory callData = _data.toBytes(48); // dataLocation: 32 + 4 + 32 = 48 (bytes array length + sig + uint256 _amount)
             _stake(_jurorSenderAddress, _jurorUniqueId, amount, callData);
 
         } else if (functionSelector == JurorsRegistry(this).unstake.selector) {
-//            assembly {
-//                amount := mload(add(dataMemory, 36)) // amountLocation: 32 + 4 = 36 (bytes array length + sig)
-//                callData := mload(add(dataMemory, 48)) // amountLocation: 32 + 4 + 32 = 48 (bytes array length + sig + uint256 _amount)
-//            }
+            bytes memory callData = _data.toBytes(48); // dataLocation: 32 + 4 + 32 = 48 (bytes array length + sig + uint256 _amount)
             _unstake(_jurorSenderAddress, _jurorUniqueId, amount, callData);
 
         } else {

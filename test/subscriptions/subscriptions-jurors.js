@@ -193,7 +193,6 @@ contract('CourtSubscriptions', ([_, payer, jurorPeriod0Term1, jurorPeriod0Term1U
 
       assert.isTrue(await subscriptions.hasJurorClaimed(jurorPeriod0Term3))
       assert.isTrue(await brightIdRegister.isVerified(jurorPeriod0Term3))
-
     })
   })
 
