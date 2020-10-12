@@ -216,7 +216,12 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
             const receipt = await registry.activate(requestedAmount, { from })
 
             assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED)
-            assertEvent(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED, { juror: jurorUniqueAddress, amount: deactivationAmount, availableTermId, processedTermId: termId })
+            assertEvent(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED, {
+              juror: jurorUniqueAddress,
+              amount: deactivationAmount,
+              availableTermId,
+              processedTermId: termId
+            })
           })
         }
       }
@@ -253,7 +258,7 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
           it('reverts', async () => {
             const amount = (await currentMaxActiveBalance()).add(amountAboveMax)
             await ANJ.approveAndCall(registry.address, amountAboveMax, '0x', { from })
-            await assertRevert(registry.activate(amount, { from }), "JR_ACTIVE_BALANCE_ABOVE_MAX")
+            await assertRevert(registry.activate(amount, { from }), 'JR_ACTIVE_BALANCE_ABOVE_MAX')
           })
         })
 
@@ -289,22 +294,19 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
           })
         })
 
-        context('when the juror calls activate through via BrightIdRegister', () => {
-          it.only('activates tokens as expected', async () => {
+        context('when the juror calls activate through the BrightIdRegister', () => {
+          it('activates tokens as expected', async () => {
             const activateAmount = MIN_ACTIVE_AMOUNT
-            await ANJ.generateTokens(juror2, activateAmount)
-            await ANJ.approveAndCall(registry.address, activateAmount, '0x', { from: juror2 })
             const activateFunctionData = registry.contract.methods.activate(activateAmount.toString()).encodeABI()
-            const { active: previousActiveBalance } = await registry.balanceOf(juror2)
-
+            const { active: previousActiveBalance } = await registry.balanceOf(juror)
             await brightIdHelper.expireVerifiedUsers()
-            assert.isFalse(await brightIdRegister.isVerified(juror2))
+            assert.isFalse(await brightIdRegister.isVerified(juror))
 
-            await brightIdHelper.registerUserWithData(juror2, registry.address, activateFunctionData)
+            await brightIdHelper.registerUserWithData([juror, jurorUniqueAddress], registry.address, activateFunctionData)
 
-            const { active: currentActiveBalance } = await registry.balanceOf(juror2)
+            const { active: currentActiveBalance } = await registry.balanceOf(juror)
             assertBn(currentActiveBalance, previousActiveBalance.add(activateAmount), 'Incorrect active balance')
-            assert.isTrue(await brightIdRegister.isVerified(juror2))
+            assert.isTrue(await brightIdRegister.isVerified(juror))
           })
         })
       })
@@ -361,7 +363,11 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
             context('when the given amount is zero', () => {
               const amount = bn(0)
 
-              itHandlesActivationProperlyFor({ requestedAmount: amount, deactivationAmount, expectDeactivationProcessed: true })
+              itHandlesActivationProperlyFor({
+                requestedAmount: amount,
+                deactivationAmount,
+                expectDeactivationProcessed: true
+              })
             })
 
             context('when the given amount is greater than the available balance', () => {
@@ -386,7 +392,7 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
                 it('reverts', async () => {
                   const amount = maxPossibleBalance.add(bn(1))
                   await ANJ.approveAndCall(registry.address, 1, '0x', { from })
-                  await assertRevert(registry.activate(amount, { from }), "JR_ACTIVE_BALANCE_ABOVE_MAX")
+                  await assertRevert(registry.activate(amount, { from }), 'JR_ACTIVE_BALANCE_ABOVE_MAX')
                 })
               })
             }
@@ -394,7 +400,11 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
             context('when the future active amount will be greater than the minimum active value', () => {
               const amount = MIN_ACTIVE_AMOUNT
 
-              itHandlesActivationProperlyFor({ requestedAmount: amount, deactivationAmount, expectDeactivationProcessed: true })
+              itHandlesActivationProperlyFor({
+                requestedAmount: amount,
+                deactivationAmount,
+                expectDeactivationProcessed: true
+              })
             })
           })
 
@@ -408,7 +418,11 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
             context('when the given amount is zero', () => {
               const amount = bn(0)
 
-              itHandlesActivationProperlyFor({ requestedAmount: amount, deactivationAmount, expectDeactivationProcessed: true })
+              itHandlesActivationProperlyFor({
+                requestedAmount: amount,
+                deactivationAmount,
+                expectDeactivationProcessed: true
+              })
             })
 
             context('when the given amount is greater than the available balance', () => {
@@ -433,7 +447,7 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
                 it('reverts', async () => {
                   const amount = maxPossibleBalance.add(bn(1))
                   await ANJ.approveAndCall(registry.address, 1, '0x', { from })
-                  await assertRevert(registry.activate(amount, { from }), "JR_ACTIVE_BALANCE_ABOVE_MAX")
+                  await assertRevert(registry.activate(amount, { from }), 'JR_ACTIVE_BALANCE_ABOVE_MAX')
                 })
               })
             }
@@ -441,7 +455,11 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
             context('when the future active amount will be greater than the minimum active value', () => {
               const amount = MIN_ACTIVE_AMOUNT
 
-              itHandlesActivationProperlyFor({ requestedAmount: amount, deactivationAmount, expectDeactivationProcessed: true })
+              itHandlesActivationProperlyFor({
+                requestedAmount: amount,
+                deactivationAmount,
+                expectDeactivationProcessed: true
+              })
             })
           })
         })
@@ -523,7 +541,7 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
             const amountToStake = TOTAL_ACTIVE_BALANCE_LIMIT.sub(maxPossibleBalance)
             await ANJ.approveAndCall(registry.address, amountToStake, '0x', { from })
 
-            await assertRevert(registry.activate(maxPossibleBalance, { from }), "JR_ACTIVE_BALANCE_ABOVE_MAX")
+            await assertRevert(registry.activate(maxPossibleBalance, { from }), 'JR_ACTIVE_BALANCE_ABOVE_MAX')
           })
         })
 
@@ -666,7 +684,11 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
             const receipt = await registry.deactivate(requestedAmount, { from })
 
             assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_REQUESTED)
-            assertEvent(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_REQUESTED, { juror: jurorUniqueAddress, availableTermId: termId.add(bn(1)), amount: expectedAmount })
+            assertEvent(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_REQUESTED, {
+              juror: jurorUniqueAddress,
+              availableTermId: termId.add(bn(1)),
+              amount: expectedAmount
+            })
           })
 
           it('can be requested at the next term', async () => {
@@ -695,7 +717,12 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
               const receipt = await registry.deactivate(requestedAmount, { from })
 
               assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED)
-              assertEvent(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED, { juror: jurorUniqueAddress, amount: previousDeactivationAmount, availableTermId, processedTermId: termId })
+              assertEvent(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED, {
+                juror: jurorUniqueAddress,
+                amount: previousDeactivationAmount,
+                availableTermId,
+                processedTermId: termId
+              })
             })
           }
         }
@@ -730,6 +757,21 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
           context('when the juror uses an unverified previous address', () => {
             it('reverts', async () => {
               await assertRevert(registry.deactivate(MIN_ACTIVE_AMOUNT, { from: jurorUniqueAddress }), 'JR_SENDER_NOT_VERIFIED')
+            })
+          })
+
+          context('when the juror calls deactivate through the BrightIdRegister', () => {
+            it('deactivates tokens as expected', async () => {
+              const deactivateFunctionData = registry.contract.methods.deactivate(activeBalance.toString()).encodeABI()
+              const { active: previousActiveBalance } = await registry.balanceOf(juror)
+              await brightIdHelper.expireVerifiedUsers()
+              assert.isFalse(await brightIdRegister.isVerified(juror))
+
+              await brightIdHelper.registerUserWithData([juror, jurorUniqueAddress], registry.address, deactivateFunctionData)
+
+              const { active: currentActiveBalance } = await registry.balanceOf(juror)
+              assertBn(currentActiveBalance, previousActiveBalance.sub(activeBalance), 'Incorrect active balance')
+              assert.isTrue(await brightIdRegister.isVerified(juror))
             })
           })
         })
@@ -897,8 +939,7 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
         await ANJ.approveAndCall(registry.address, jurorActiveBalance, ACTIVATE_DATA, { from: juror })
         const maxActiveBalanceAfterStake = await registry.maxActiveBalance(termId)
 
-        const juror2ActiveBalance = await maxActiveBalanceAtTerm(termId) // TODO: Test removing this. Should be the same as above check
-        await ANJ.approveAndCall(registry.address, juror2ActiveBalance, ACTIVATE_DATA, { from: juror2 })
+        await ANJ.approveAndCall(registry.address, jurorActiveBalance, ACTIVATE_DATA, { from: juror2 })
         assertBn(await registry.maxActiveBalance(termId), maxActiveBalanceAfterStake, 'Incorrect max active balance after stake')
 
         await controller.mockIncreaseTerm()
@@ -907,6 +948,30 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
       })
 
     })
+
+  })
+
+  describe('receive registration', () => {
+
+    context('when the caller is not the BrightIdRegister', () => {
+      it('reverts', async () => {
+        await assertRevert(registry.receiveRegistration(juror, jurorUniqueAddress, '0x0'), 'JR_SENDER_NOT_BRIGHTID_REGISTER')
+      })
+    })
+
+    context('when the data does not involve an available function', () => {
+      it('reverts', async () => {
+        await ANJ.generateTokens(juror, MIN_ACTIVE_AMOUNT)
+        await ANJ.approveAndCall(registry.address, MIN_ACTIVE_AMOUNT, '0x', { from: juror })
+        await registry.activate(MIN_ACTIVE_AMOUNT, { from: juror })
+
+        const incorrectFunctionData = registry.contract.methods.processDeactivationRequest(juror).encodeABI()
+
+        await assertRevert(brightIdHelper.registerUserWithData(
+          [juror, jurorUniqueAddress], registry.address, incorrectFunctionData), 'JR_NO_FUNCTION_MATCH')
+      })
+    })
+
 
   })
 })

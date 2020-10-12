@@ -189,7 +189,7 @@ contract('CourtSubscriptions', ([_, payer, jurorPeriod0Term1, jurorPeriod0Term1U
       assert.isFalse(await subscriptions.hasJurorClaimed(jurorPeriod0Term3))
       assert.isFalse(await brightIdRegister.isVerified(jurorPeriod0Term3))
 
-      await brightIdHelper.registerUserWithData(jurorPeriod0Term3, subscriptions.address, '0x0')
+      await brightIdHelper.registerUserWithData([jurorPeriod0Term3], subscriptions.address, '0x0')
 
       assert.isTrue(await subscriptions.hasJurorClaimed(jurorPeriod0Term3))
       assert.isTrue(await brightIdRegister.isVerified(jurorPeriod0Term3))
