@@ -16,7 +16,7 @@ const ERC20 = artifacts.require('ERC20Mock')
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
 contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueAddress]) => {
-  let controller, registry, disputeManager, ANJ, brightIdRegister
+  let controller, registry, disputeManager, ANJ, brightIdHelper, brightIdRegister
 
   const MIN_ACTIVE_AMOUNT = bigExp(100, 18)
   const TOTAL_ACTIVE_BALANCE_LIMIT = bigExp(100e6, 18)
@@ -29,7 +29,7 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
   })
 
   beforeEach('create jurors registry module', async () => {
-    const brightIdHelper = buildBrightIdHelper()
+    brightIdHelper = buildBrightIdHelper()
     brightIdRegister = await brightIdHelper.deploy()
     await brightIdHelper.registerUsersWithMultipleAddresses(
       [[jurorUniqueAddress, juror], [juror2UniqueAddress, juror2]])
@@ -165,6 +165,21 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
         context('when the juror uses an unverified previous address', () => {
           it('reverts', async () => {
             await assertRevert(registry.stake(MIN_ACTIVE_AMOUNT, data, { from: jurorUniqueAddress }), 'JR_SENDER_NOT_VERIFIED')
+          })
+        })
+
+        context('when the juror calls stake through the BrightIdRegister', () => {
+          it('stakes tokens as expected', async () => {
+            const stakeAmount = MIN_ACTIVE_AMOUNT
+            await ANJ.generateTokens(from, stakeAmount)
+            await ANJ.approve(registry.address, stakeAmount, { from })
+            const stakeFunctionData = registry.contract.methods.stake(stakeAmount.toString(), data).encodeABI()
+            const { available: previousAvailableBalance } = await registry.balanceOf(from)
+
+            await brightIdHelper.registerUserWithData([juror, jurorUniqueAddress], registry.address, stakeFunctionData)
+
+            const { available: currentAvailableBalance } = await registry.balanceOf(from)
+            assertBn(currentAvailableBalance, previousAvailableBalance.add(stakeAmount), 'available balances do not match')
           })
         })
       }
@@ -324,6 +339,21 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
         context('when the juror uses an unverified previous address', () => {
           it('reverts', async () => {
             await assertRevert(registry.stake(MIN_ACTIVE_AMOUNT, data, { from: jurorUniqueAddress }), 'JR_SENDER_NOT_VERIFIED')
+          })
+        })
+
+        context('when the juror calls stake through the BrightIdRegister', () => {
+          it('stakes tokens as expected', async () => {
+            const stakeAmount = MIN_ACTIVE_AMOUNT
+            await ANJ.generateTokens(from, stakeAmount)
+            await ANJ.approve(registry.address, stakeAmount, { from })
+            const stakeFunctionData = registry.contract.methods.stake(stakeAmount.toString(), data).encodeABI()
+            const { active: previousActiveBalance } = await registry.balanceOf(from)
+
+            await brightIdHelper.registerUserWithData([juror, jurorUniqueAddress], registry.address, stakeFunctionData)
+
+            const { active: currentActiveBalance } = await registry.balanceOf(from)
+            assertBn(currentActiveBalance, previousActiveBalance.add(stakeAmount), 'available balances do not match')
           })
         })
       }
@@ -1177,6 +1207,18 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
         context('when the juror uses and unverified previous address', async() => {
           it('reverts', async () => {
             await assertRevert(registry.unstake(MIN_ACTIVE_AMOUNT, data, { from: jurorUniqueAddress }), 'JR_SENDER_NOT_VERIFIED')
+          })
+        })
+
+        context('when the juror calls unstake through the BrightIdRegister', () => {
+          it('unstakes tokens as expected', async () => {
+            const unstakeFunctionData = registry.contract.methods.unstake(stakedBalance.toString(), data).encodeABI()
+            const { available: previousAvailableBalance } = await registry.balanceOf(from)
+
+            const receipt = await brightIdHelper.registerUserWithData([juror, jurorUniqueAddress], registry.address, unstakeFunctionData)
+
+            const { available: currentAvailableBalance } = await registry.balanceOf(from)
+            assertBn(currentAvailableBalance, previousAvailableBalance.sub(stakedBalance), 'available balances do not match')
           })
         })
       })

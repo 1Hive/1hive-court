@@ -228,11 +228,11 @@ contract JurorsRegistry is ControlledRecoverable, IJurorsRegistry, ERC900, Appro
             _deactivateTokens(_jurorUniqueId, amount);
 
         } else if (functionSelector == JurorsRegistry(this).stake.selector) {
-            bytes memory callData = _data.toBytes(48); // dataLocation: 32 + 4 + 32 = 48 (bytes array length + sig + uint256 _amount)
+            bytes memory callData = _data.extractBytes(100, 4); // callDataLocation: 4 + 32 + 32 + 32 = 100 (sig + uint256 _amount + callData location + callData length)
             _stake(_jurorSenderAddress, _jurorUniqueId, amount, callData);
 
         } else if (functionSelector == JurorsRegistry(this).unstake.selector) {
-            bytes memory callData = _data.toBytes(48); // dataLocation: 32 + 4 + 32 = 48 (bytes array length + sig + uint256 _amount)
+            bytes memory callData = _data.extractBytes(100, 4); // callDataLocation: 4 + 32 + 32 + 32 = 100 (sig + uint256 _amount + callData location + callData length)
             _unstake(_jurorSenderAddress, _jurorUniqueId, amount, callData);
 
         } else {
