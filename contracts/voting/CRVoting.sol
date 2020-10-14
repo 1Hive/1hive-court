@@ -22,6 +22,8 @@ contract CRVoting is Controlled, ICRVoting {
     string private constant ERROR_INVALID_COMMITMENT_SALT = "CRV_INVALID_COMMITMENT_SALT";
     string private constant ERROR_SENDER_NOT_VERIFIED = "CRV_SENDER_NOT_VERIFIED";
     string private constant ERROR_SENDER_NOT_BRIGHTID_REGISTER = "CRV_SENDER_NOT_BRIGHTID_REGISTER";
+    string private constant ERROR_NO_FUNCTION_MATCH = "CRV_NO_FUNCTION_MATCH";
+
 
     // Outcome nr. 0 is used to denote a missing vote (default)
     uint8 internal constant OUTCOME_MISSING = uint8(0);
@@ -150,10 +152,12 @@ contract CRVoting is Controlled, ICRVoting {
     function receiveRegistration(address _voterSenderAddress, address _voterUniqueId, bytes calldata _data) external {
         require(msg.sender == address(_brightIdRegister()), ERROR_SENDER_NOT_BRIGHTID_REGISTER);
 
-        if(_data.toBytes4() == CRVoting(this).commit.selector) {
+        if (_data.toBytes4() == CRVoting(this).commit.selector) {
             uint256 voteId = _data.toUint256(4); // voteIdLocation: 4 (from end of sig)
             bytes32 commitment = _data.toBytes32(36); // commitmentLocation: 4 + 32 = 36 (from end of sig + uint256 voteId)
             _commit(voteId, commitment, _voterUniqueId);
+        } else {
+            revert(ERROR_NO_FUNCTION_MATCH);
         }
     }
 

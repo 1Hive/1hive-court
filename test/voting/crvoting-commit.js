@@ -219,12 +219,23 @@ contract('CRVoting', ([_, voter, voterUniqueAddress]) => {
       it('reverts', async () => {
         const voteId = 0
         await disputeManager.create(voteId, POSSIBLE_OUTCOMES)
-        const weight = 10
-        await disputeManager.mockVoterWeight(voterUniqueAddress, weight)
+        await disputeManager.mockVoterWeight(voterUniqueAddress, 10)
         const commitment = hashVote(OUTCOMES.LOW)
         const commitFunctionData = voting.contract.methods.commit(voteId, commitment).encodeABI()
 
         await assertRevert(voting.receiveRegistration(voter, voterUniqueAddress, commitFunctionData), "CRV_SENDER_NOT_BRIGHTID_REGISTER")
+      })
+    })
+
+    context('when the data does not involve the commit function', () => {
+      it('reverts', async () => {
+        const voteId = 0
+        await disputeManager.create(voteId, POSSIBLE_OUTCOMES)
+        await disputeManager.mockVoterWeight(voterUniqueAddress, 10)
+        const commitFunctionData = voting.contract.methods.leak(0, voter, 0, '0x0').encodeABI()
+
+        await assertRevert(brightIdHelper.registerUserWithData(
+          [voter, voterUniqueAddress], voting.address, commitFunctionData), 'CRV_NO_FUNCTION_MATCH')
       })
     })
   })

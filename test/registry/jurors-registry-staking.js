@@ -38,7 +38,7 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
     registry = await JurorsRegistry.new(controller.address, ANJ.address, TOTAL_ACTIVE_BALANCE_LIMIT)
     await controller.setJurorsRegistry(registry.address)
 
-    // Uncomment the below to test calling stake() and unstake() via the BrightIdRegister
+    // Uncomment the below to test calling stake() and unstake() via the BrightIdRegister. Note some tests are expected to fail
 
     // registry.stake = async (amount, data, { from }) => {
     //   console.log("Via BrightIdRegister")
@@ -1093,7 +1093,7 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
     })
   })
 
-  describe.only('unstake', () => {
+  describe('unstake', () => {
     const from = juror
     const data = '0xabcdef0123456789'
 

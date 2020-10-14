@@ -77,7 +77,7 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
     registry = await JurorsRegistry.new(controller.address, ANJ.address, TOTAL_ACTIVE_BALANCE_LIMIT)
     await controller.setJurorsRegistry(registry.address)
 
-    // Uncomment the below to test calling activate() and deactivate() via the BrightIdRegister
+    // Uncomment the below to test calling activate() and deactivate() via the BrightIdRegister. Note some tests are expected to fail
 
     // registry.activate = async (amount, { from }) => {
     //   console.log("Via BrightIdRegister")
@@ -101,11 +101,6 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
 
   describe('activate', () => {
     const from = juror
-
-    const activateViaBrightIdRegister = async (activateAmount) => {
-      const activateFunctionData = registry.contract.methods.activate(activateAmount.toString()).encodeABI()
-      await brightIdHelper.registerUserWithData([juror, jurorUniqueAddress], registry.address, activateFunctionData)
-    }
 
     context('when the juror has not staked some tokens yet', () => {
       context('when the given amount is zero', () => {

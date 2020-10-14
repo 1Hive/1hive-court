@@ -27,7 +27,7 @@ library BytesHelpers {
 
     // See https://github.com/GNSPS/solidity-bytes-utils/blob/master/contracts/BytesLib.sol for a more efficient but risky alternative
     function extractBytes(bytes memory _self, uint256 _from, uint256 _numberOfBytes) internal pure returns(bytes memory) {
-        if (_self.length < _from + _numberOfBytes) {
+        if (_self.length < _from + _numberOfBytes) { // No SafeMath as input is hardcoded
             return new bytes(0);
         }
 
