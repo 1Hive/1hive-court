@@ -6,10 +6,12 @@ import "./ICRVoting.sol";
 import "./ICRVotingOwner.sol";
 import "../court/controller/Controlled.sol";
 import "../court/controller/Controller.sol";
+import "../lib/BytesHelpers.sol";
 
 
 contract CRVoting is Controlled, ICRVoting {
     using SafeMath for uint256;
+    using BytesHelpers for bytes;
 
     string private constant ERROR_VOTE_ALREADY_EXISTS = "CRV_VOTE_ALREADY_EXISTS";
     string private constant ERROR_VOTE_DOES_NOT_EXIST = "CRV_VOTE_DOES_NOT_EXIST";
@@ -19,6 +21,7 @@ contract CRVoting is Controlled, ICRVoting {
     string private constant ERROR_INVALID_OUTCOMES_AMOUNT = "CRV_INVALID_OUTCOMES_AMOUNT";
     string private constant ERROR_INVALID_COMMITMENT_SALT = "CRV_INVALID_COMMITMENT_SALT";
     string private constant ERROR_SENDER_NOT_VERIFIED = "CRV_SENDER_NOT_VERIFIED";
+    string private constant ERROR_SENDER_NOT_BRIGHTID_REGISTER = "CRV_SENDER_NOT_BRIGHTID_REGISTER";
 
     // Outcome nr. 0 is used to denote a missing vote (default)
     uint8 internal constant OUTCOME_MISSING = uint8(0);
@@ -93,14 +96,9 @@ contract CRVoting is Controlled, ICRVoting {
     */
     function commit(uint256 _voteId, bytes32 _commitment) external voteExists(_voteId) {
         require(_brightIdRegister().isVerified(msg.sender), ERROR_SENDER_NOT_VERIFIED);
-
         address voterUniqueId = _voterUniqueId(msg.sender);
-        CastVote storage castVote = voteRecords[_voteId].votes[voterUniqueId];
-        require(castVote.commitment == bytes32(0), ERROR_VOTE_ALREADY_COMMITTED);
-        _ensureVoterCanCommit(_voteId, voterUniqueId);
 
-        castVote.commitment = _commitment;
-        emit VoteCommitted(_voteId, voterUniqueId, _commitment);
+        _commit(_voteId, _commitment, voterUniqueId);
     }
 
     /**
@@ -141,6 +139,22 @@ contract CRVoting is Controlled, ICRVoting {
         castVote.outcome = _outcome;
         _updateTally(vote, _outcome, weight);
         emit VoteRevealed(_voteId, voterUniqueId, _outcome, msg.sender);
+    }
+
+    /**
+    * @dev The user just verified themselves in the BrightIdRegister, claim on there behalf.
+    * @param _voterSenderAddress The address from which the transaction was created
+    * @param _voterUniqueId The unique address assigned to the registered BrightId user
+    * @param _data Data used to determine what function to call, unused here
+    */
+    function receiveRegistration(address _voterSenderAddress, address _voterUniqueId, bytes calldata _data) external {
+        require(msg.sender == address(_brightIdRegister()), ERROR_SENDER_NOT_BRIGHTID_REGISTER);
+
+        if(_data.toBytes4() == CRVoting(this).commit.selector) {
+            uint256 voteId = _data.toUint256(4); // voteIdLocation: 4 (from end of sig)
+            bytes32 commitment = _data.toBytes32(36); // commitmentLocation: 4 + 32 = 36 (from end of sig + uint256 voteId)
+            _commit(voteId, commitment, _voterUniqueId);
+        }
     }
 
     /**
@@ -244,6 +258,21 @@ contract CRVoting is Controlled, ICRVoting {
     */
     function hashVote(uint8 _outcome, bytes32 _salt) external pure returns (bytes32) {
         return _hashVote(_outcome, _salt);
+    }
+
+    /**
+    * @notice Commit a vote for vote #`_voteId`
+    * @param _voteId ID of the vote instance to commit a vote to
+    * @param _commitment Hashed outcome to be stored for future reveal
+    * @param _voterUniqueId Voter unique ID from the BrightIdRegister
+    */
+    function _commit(uint256 _voteId, bytes32 _commitment, address _voterUniqueId) internal voteExists(_voteId) {
+        CastVote storage castVote = voteRecords[_voteId].votes[_voterUniqueId];
+        require(castVote.commitment == bytes32(0), ERROR_VOTE_ALREADY_COMMITTED);
+        _ensureVoterCanCommit(_voteId, _voterUniqueId);
+
+        castVote.commitment = _commitment;
+        emit VoteCommitted(_voteId, _voterUniqueId, _commitment);
     }
 
     /**

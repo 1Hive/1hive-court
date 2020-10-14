@@ -219,7 +219,7 @@ contract JurorsRegistry is ControlledRecoverable, IJurorsRegistry, ERC900, Appro
         require(msg.sender == address(_brightIdRegister()), ERROR_SENDER_NOT_BRIGHTID_REGISTER);
 
         bytes4 functionSelector = _data.toBytes4();
-        uint256 amount = _data.toUint256(36); // amountLocation: 32 + 4 = 36 (bytes array length + sig)
+        uint256 amount = _data.toUint256(4); // amountLocation: 4 (from end of sig)
 
         if (functionSelector == JurorsRegistry(this).activate.selector) {
             _activateTokens(_jurorUniqueId, amount, _jurorSenderAddress);

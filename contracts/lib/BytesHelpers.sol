@@ -10,14 +10,22 @@ library BytesHelpers {
     }
 
     function toUint256(bytes memory _self, uint256 _location) internal pure returns (uint256 result) {
-        if (_self.length < 32) {
+        if (_self.length < _location + 32) { // Location + uint256 length. No SafeMath as input is hardcoded
             return 0;
         }
-
-        assembly { result := mload(add(_self, _location)) }
+        uint256 realLocation = _location + 32; // Location + bytes array length
+        assembly { result := mload(add(_self, realLocation)) }
     }
 
-    // See https://github.com/GNSPS/solidity-bytes-utils/blob/master/contracts/BytesLib.sol for a more efficient and risky alternative
+    function toBytes32(bytes memory _self, uint256 _location) internal pure returns (bytes32 result) {
+        if (_self.length < _location + 32) { // Location + bytes32 length. No SafeMath as input is hardcoded
+            return bytes32(0);
+        }
+        uint256 realLocation = _location + 32; // Location + bytes array length
+        assembly { result := mload(add(_self, realLocation)) }
+    }
+
+    // See https://github.com/GNSPS/solidity-bytes-utils/blob/master/contracts/BytesLib.sol for a more efficient but risky alternative
     function extractBytes(bytes memory _self, uint256 _from, uint256 _numberOfBytes) internal pure returns(bytes memory) {
         bytes memory returnValue = new bytes(_numberOfBytes);
         for (uint256 i = _from; i < _from + _numberOfBytes; i++) {
