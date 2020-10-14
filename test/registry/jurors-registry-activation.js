@@ -7,6 +7,7 @@ const { REGISTRY_EVENTS } = require('../helpers/utils/events')
 const { REGISTRY_ERRORS } = require('../helpers/utils/errors')
 const { assertEvent, assertAmountOfEvents } = require('../helpers/asserts/assertEvent')
 const { ACTIVATE_DATA } = require('../helpers/utils/jurors')
+const JurorsRegistryABI = require('../../abi/JurorsRegistry.json')
 
 const JurorsRegistry = artifacts.require('JurorsRegistry')
 const DisputeManager = artifacts.require('DisputeManagerMockForRegistry')
@@ -75,10 +76,36 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
     ANJ = await ERC20.new('ANJ Token', 'ANJ', 18)
     registry = await JurorsRegistry.new(controller.address, ANJ.address, TOTAL_ACTIVE_BALANCE_LIMIT)
     await controller.setJurorsRegistry(registry.address)
+
+    // Uncomment the below to test calling activate() and deactivate() via the BrightIdRegister
+
+    // registry.activate = async (amount, { from }) => {
+    //   console.log("Via BrightIdRegister")
+    //   const activateFunctionData = registry.contract.methods.activate(amount.toString()).encodeABI()
+    //   if (from === juror) {
+    //     return await brightIdHelper.registerUserWithData([juror, jurorUniqueAddress], registry.address, activateFunctionData)
+    //   } else {
+    //     return await brightIdHelper.registerUserWithData([from], registry.address, activateFunctionData)
+    //   }
+    // }
+    // registry.deactivate = async (amount, { from }) => {
+    //   console.log("Via BrightIdRegister")
+    //   const deactivateFunctionData = registry.contract.methods.deactivate(amount.toString()).encodeABI()
+    //   if (from === juror) {
+    //     return await brightIdHelper.registerUserWithData([from, jurorUniqueAddress], registry.address, deactivateFunctionData)
+    //   } else {
+    //     return await brightIdHelper.registerUserWithData([from], registry.address, deactivateFunctionData)
+    //   }
+    // }
   })
 
   describe('activate', () => {
     const from = juror
+
+    const activateViaBrightIdRegister = async (activateAmount) => {
+      const activateFunctionData = registry.contract.methods.activate(activateAmount.toString()).encodeABI()
+      await brightIdHelper.registerUserWithData([juror, jurorUniqueAddress], registry.address, activateFunctionData)
+    }
 
     context('when the juror has not staked some tokens yet', () => {
       context('when the given amount is zero', () => {
@@ -201,9 +228,11 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
           const activationAmount = requestedAmount.eq(bn(0))
             ? (deactivationDue ? previousAvailableBalance.add(previousDeactivationBalance) : previousAvailableBalance)
             : requestedAmount
-          assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_ACTIVATED)
+
+          assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_ACTIVATED, 1, JurorsRegistryABI)
           assertEvent(receipt, REGISTRY_EVENTS.JUROR_ACTIVATED,
-            { juror: jurorUniqueAddress, fromTermId: termId.add(bn(1)), amount: activationAmount, sender: from })
+            { juror: jurorUniqueAddress, fromTermId: termId.add(bn(1)), amount: activationAmount, sender: from },
+            0, JurorsRegistryABI)
         })
 
         if (expectDeactivationProcessed) {
@@ -215,13 +244,13 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
 
             const receipt = await registry.activate(requestedAmount, { from })
 
-            assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED)
+            assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED, 1, JurorsRegistryABI)
             assertEvent(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED, {
               juror: jurorUniqueAddress,
               amount: deactivationAmount,
               availableTermId,
               processedTermId: termId
-            })
+            }, 0, JurorsRegistryABI)
           })
         }
       }
@@ -683,12 +712,12 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
             const termId = await controller.getLastEnsuredTermId()
             const receipt = await registry.deactivate(requestedAmount, { from })
 
-            assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_REQUESTED)
+            assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_REQUESTED, 1, JurorsRegistryABI)
             assertEvent(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_REQUESTED, {
               juror: jurorUniqueAddress,
               availableTermId: termId.add(bn(1)),
               amount: expectedAmount
-            })
+            }, 0, JurorsRegistryABI)
           })
 
           it('can be requested at the next term', async () => {
@@ -716,13 +745,13 @@ contract('JurorsRegistry', ([_, juror, jurorUniqueAddress, juror2]) => {
 
               const receipt = await registry.deactivate(requestedAmount, { from })
 
-              assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED)
+              assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED, 1, JurorsRegistryABI)
               assertEvent(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED, {
                 juror: jurorUniqueAddress,
                 amount: previousDeactivationAmount,
                 availableTermId,
                 processedTermId: termId
-              })
+              }, 0, JurorsRegistryABI)
             })
           }
         }

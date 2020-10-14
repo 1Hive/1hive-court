@@ -37,6 +37,31 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
 
     registry = await JurorsRegistry.new(controller.address, ANJ.address, TOTAL_ACTIVE_BALANCE_LIMIT)
     await controller.setJurorsRegistry(registry.address)
+
+    // Uncomment the below to test calling stake() and unstake() via the BrightIdRegister
+
+    // registry.stake = async (amount, data, { from }) => {
+    //   console.log("Via BrightIdRegister")
+    //   const stakeFunctionData = registry.contract.methods.stake(amount.toString(), data).encodeABI()
+    //   if (from === juror) {
+    //     return await brightIdHelper.registerUserWithData([juror, jurorUniqueAddress], registry.address, stakeFunctionData)
+    //   } else if (from === juror2) {
+    //     return await brightIdHelper.registerUserWithData([juror2, juror2UniqueAddress], registry.address, stakeFunctionData)
+    //   } else {
+    //     return await brightIdHelper.registerUserWithData([from], registry.address, stakeFunctionData)
+    //   }
+    // }
+    // registry.unstake = async (amount, data, { from }) => {
+    //   console.log("Via BrightIdRegister")
+    //   const unstakeFunctionData = registry.contract.methods.unstake(amount.toString(), data).encodeABI()
+    //   if (from === juror) {
+    //     return await brightIdHelper.registerUserWithData([juror, jurorUniqueAddress], registry.address, unstakeFunctionData)
+    //   } else if (from === juror2) {
+    //     return await brightIdHelper.registerUserWithData([juror2, juror2UniqueAddress], registry.address, unstakeFunctionData)
+    //   } else {
+    //     return await brightIdHelper.registerUserWithData([from], registry.address, unstakeFunctionData)
+    //   }
+    // }
   })
 
   const registryDefinedUniqueUserId = async (address) => {
@@ -129,8 +154,9 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
 
             const receipt = await registry.stake(amount, data, { from })
 
-            assertAmountOfEvents(receipt, REGISTRY_EVENTS.STAKED)
-            assertEvent(receipt, REGISTRY_EVENTS.STAKED, { user: jurorUniqueAddress, amount, total: previousTotalStake.add(amount), data })
+            assertAmountOfEvents(receipt, REGISTRY_EVENTS.STAKED, 1, JurorsRegistry.abi)
+            assertEvent(receipt, REGISTRY_EVENTS.STAKED,
+              { user: jurorUniqueAddress, amount, total: previousTotalStake.add(amount), data }, 0, JurorsRegistry.abi)
           })
         })
 
@@ -273,8 +299,9 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
 
           const receipt = await registry.stake(amount, data, { from })
 
-          assertAmountOfEvents(receipt, REGISTRY_EVENTS.STAKED)
-          assertEvent(receipt, REGISTRY_EVENTS.STAKED, { user: jurorUniqueAddress, amount, total: previousTotalStake.add(amount), data })
+          assertAmountOfEvents(receipt, REGISTRY_EVENTS.STAKED, 1, JurorsRegistry.abi)
+          assertEvent(receipt, REGISTRY_EVENTS.STAKED,
+            { user: jurorUniqueAddress, amount, total: previousTotalStake.add(amount), data }, 0, JurorsRegistry.abi)
         })
 
         it('emits an activation event', async () => {
@@ -282,8 +309,9 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
 
           const receipt = await registry.stake(amount, data, { from })
 
-          assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_ACTIVATED)
-          assertEvent(receipt, REGISTRY_EVENTS.JUROR_ACTIVATED, { juror: jurorUniqueAddress, fromTermId: termId.add(bn(1)), amount, sender: from })
+          assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_ACTIVATED, 1, JurorsRegistry.abi)
+          assertEvent(receipt, REGISTRY_EVENTS.JUROR_ACTIVATED,
+            { juror: jurorUniqueAddress, fromTermId: termId.add(bn(1)), amount, sender: from }, 0, JurorsRegistry.abi)
         })
       }
 
@@ -487,8 +515,9 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
           const receipt = await registry.stakeFor(recipient, amount, data, { from })
 
           const uniqueUserId = await registryDefinedUniqueUserId(recipient)
-          assertAmountOfEvents(receipt, REGISTRY_EVENTS.STAKED)
-          assertEvent(receipt, REGISTRY_EVENTS.STAKED, { user: uniqueUserId, amount, total: previousTotalStake.add(amount), data })
+          assertAmountOfEvents(receipt, REGISTRY_EVENTS.STAKED, 1, JurorsRegistry.abi)
+          assertEvent(receipt, REGISTRY_EVENTS.STAKED,
+            { user: uniqueUserId, amount, total: previousTotalStake.add(amount), data }, 0, JurorsRegistry.abi)
         })
       })
 
@@ -666,8 +695,9 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
           const receipt = await registry.stakeFor(recipient, amount, data, { from })
 
           const uniqueUserId = await registryDefinedUniqueUserId(recipient)
-          assertAmountOfEvents(receipt, REGISTRY_EVENTS.STAKED)
-          assertEvent(receipt, REGISTRY_EVENTS.STAKED, { user: uniqueUserId, amount, total: previousTotalStake.add(amount), data })
+          assertAmountOfEvents(receipt, REGISTRY_EVENTS.STAKED, 1, JurorsRegistry.abi)
+          assertEvent(receipt, REGISTRY_EVENTS.STAKED,
+            { user: uniqueUserId, amount, total: previousTotalStake.add(amount), data }, 0, JurorsRegistry.abi)
         })
 
         it('emits an activation event', async () => {
@@ -676,8 +706,9 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
           const receipt = await registry.stakeFor(recipient, amount, data, { from })
 
           const uniqueUserId = await registryDefinedUniqueUserId(recipient)
-          assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_ACTIVATED)
-          assertEvent(receipt, REGISTRY_EVENTS.JUROR_ACTIVATED, { juror: uniqueUserId, fromTermId: termId.add(bn(1)), amount, sender: from })
+          assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_ACTIVATED, 1, JurorsRegistry.abi)
+          assertEvent(receipt, REGISTRY_EVENTS.JUROR_ACTIVATED,
+            { juror: uniqueUserId, fromTermId: termId.add(bn(1)), amount, sender: from }, 0, JurorsRegistry.abi)
         })
       }
 
@@ -1062,7 +1093,7 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
     })
   })
 
-  describe('unstake', () => {
+  describe.only('unstake', () => {
     const from = juror
     const data = '0xabcdef0123456789'
 
@@ -1164,8 +1195,9 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
 
           const receipt = await registry.unstake(amount, data, { from })
 
-          assertAmountOfEvents(receipt, REGISTRY_EVENTS.UNSTAKED)
-          assertEvent(receipt, REGISTRY_EVENTS.UNSTAKED, { user: jurorUniqueAddress, amount, total: previousTotalStake.sub(amount), data })
+          assertAmountOfEvents(receipt, REGISTRY_EVENTS.UNSTAKED, 1, JurorsRegistry.abi)
+          assertEvent(receipt, REGISTRY_EVENTS.UNSTAKED,
+            { user: jurorUniqueAddress, amount, total: previousTotalStake.sub(amount), data }, 0, JurorsRegistry.abi)
         })
 
         if (deactivationAmount.gt(bn(0))) {
@@ -1175,8 +1207,9 @@ contract('JurorsRegistry', ([_, juror, juror2, jurorUniqueAddress, juror2UniqueA
 
             const receipt = await registry.unstake(amount, data, { from })
 
-            assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED)
-            assertEvent(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED, { juror: jurorUniqueAddress, amount: deactivationAmount, availableTermId, processedTermId: termId })
+            assertAmountOfEvents(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED, 1, JurorsRegistry.abi)
+            assertEvent(receipt, REGISTRY_EVENTS.JUROR_DEACTIVATION_PROCESSED,
+              { juror: jurorUniqueAddress, amount: deactivationAmount, availableTermId, processedTermId: termId }, 0, JurorsRegistry.abi)
           })
         }
       }

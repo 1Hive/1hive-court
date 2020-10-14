@@ -27,6 +27,10 @@ library BytesHelpers {
 
     // See https://github.com/GNSPS/solidity-bytes-utils/blob/master/contracts/BytesLib.sol for a more efficient but risky alternative
     function extractBytes(bytes memory _self, uint256 _from, uint256 _numberOfBytes) internal pure returns(bytes memory) {
+        if (_self.length < _from + _numberOfBytes) {
+            return new bytes(0);
+        }
+
         bytes memory returnValue = new bytes(_numberOfBytes);
         for (uint256 i = _from; i < _from + _numberOfBytes; i++) {
             returnValue[i - _from] = _self[i];
